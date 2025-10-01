@@ -1,0 +1,45 @@
+# Node
+node_modules
+.pnpm-store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp.*
+
+# Next.js
+.next
+out
+.vercel
+
+# Build
+/dist
+/build
+coverage
+
+# Logs
+logs
+*.log
+
+# dotenv
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode
+.idea
+.DS_Store
+
+# Python
+__pycache__
+*.pyc
+.venv
+
+# Playwright
+playwright-report
+blob-report
+trace.zip
+
+# Docker
+**/pgdata
+**/redisdata
