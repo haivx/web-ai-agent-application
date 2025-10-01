@@ -2,7 +2,7 @@
   "name": "photo-organizer-monorepo",
   "private": true,
   "version": "0.0.0",
-  "packageManager": "pnpm@8.15.4",
+  "packageManager": "pnpm@9.0.0",
   "workspaces": [
     "apps/web"
   ],
