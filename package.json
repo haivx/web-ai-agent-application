@@ -2,20 +2,20 @@
   "name": "photo-organizer-monorepo",
   "private": true,
   "version": "0.0.0",
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@9",
   "workspaces": [
     "apps/web"
   ],
   "scripts": {
-    "dev": "pnpm --filter web dev",
-    "build": "pnpm --filter web build",
-    "start": "pnpm --filter web start",
+    "dev": "pnpm --filter ./apps/web dev",
+    "build": "pnpm --filter ./apps/web build",
+    "start": "pnpm --filter ./apps/web start",
+    "lint": "pnpm --filter ./apps/web lint",
     "test": "pnpm run test:unit && pnpm run test:e2e",
-    "test:unit": "pnpm --filter web test:unit",
-    "test:e2e": "pnpm --filter web test:e2e",
-    "coverage": "pnpm --filter web coverage",
-    "ci": "pnpm install && pnpm run lint && pnpm run test:unit -- --coverage",
-    "lint": "pnpm --filter web lint"
+    "test:unit": "pnpm --filter ./apps/web test:unit",
+    "test:e2e": "pnpm --filter ./apps/web test:e2e",
+    "coverage": "pnpm --filter ./apps/web coverage",
+    "ci": "pnpm lint && pnpm test:unit"
   },
   "devDependencies": {
     "@types/node": "20.12.7",
