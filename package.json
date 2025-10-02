@@ -1,0 +1,22 @@
+{
+  "name": "photo-organizer",
+  "private": true,
+  "packageManager": "pnpm@8.15.5",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "format": "prettier -w ."
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "7.8.0",
+    "@typescript-eslint/parser": "7.8.0",
+    "eslint": "8.57.0",
+    "eslint-config-next": "14.2.3",
+    "eslint-config-prettier": "9.1.0",
+    "prettier": "3.2.5",
+    "turbo": "1.12.3",
+    "typescript": "5.4.5"
+  }
+}
