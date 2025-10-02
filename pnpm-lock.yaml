@@ -11,29 +11,14 @@ importers:
   apps/web:
     dependencies:
       next:
-        specifier: workspace:*
-        version: link:../services/next
+        specifier: 15.0.0
+        version: 15.0.0
       react:
-        specifier: workspace:*
-        version: link:../services/react
+        specifier: 18.3.1
+        version: 18.3.1
       react-dom:
-        specifier: workspace:*
-        version: link:../services/react-dom
-    devDependencies: {}
-  services/next:
-    dependencies: {}
-    devDependencies: {}
-  services/react:
-    dependencies: {}
-    devDependencies: {}
-  services/react-dom:
-    dependencies: {}
+        specifier: 18.3.1
+        version: 18.3.1
     devDependencies: {}
 
-packages:
-  link:../services/next:
-    resolution: {directory: ../services/next, type: directory}
-  link:../services/react:
-    resolution: {directory: ../services/react, type: directory}
-  link:../services/react-dom:
-    resolution: {directory: ../services/react-dom, type: directory}
+packages: {}
