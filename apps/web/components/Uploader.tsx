@@ -1,280 +1,238 @@
 'use client';
 
-import { useCallback, useState } from 'react';
-import { FileRejection, useDropzone } from 'react-dropzone';
-
-type UploadStatus = 'pending' | 'uploading' | 'done' | 'error';
+import * as React from 'react';
+import { useDropzone } from 'react-dropzone';
 
 type UploadItem = {
-  id: string;
   file: File;
-  progress: number;
-  status: UploadStatus;
-  error?: string;
+  key?: string;
+  putUrl?: string;
   getUrl?: string;
+  progress: number;
+  status: 'idle' | 'uploading' | 'done' | 'error';
+  error?: string;
 };
 
-type PresignedUpload = {
-  key: string;
-  putUrl: string;
-  getUrl: string;
-  contentType: string;
-};
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes)) {
-    return `${bytes} B`;
-  }
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  const decimals = value >= 10 || unitIndex === 0 ? 0 : 1;
-  return `${value.toFixed(decimals)} ${units[unitIndex]}`;
-}
+type Presigned = { key: string; putUrl: string; getUrl: string; contentType: string };
 
 export default function Uploader() {
-  const [uploads, setUploads] = useState<UploadItem[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
+  const [items, setItems] = React.useState<UploadItem[]>([]);
+  const [jobId, setJobId] = React.useState<string | null>(null);
+  const [jobStatus, setJobStatus] = React.useState<{ status: string; progress: number } | null>(null);
+  const [busy, setBusy] = React.useState(false);
 
-  const updateUpload = useCallback((id: string, patch: Partial<UploadItem>) => {
-    setUploads((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...patch } : item))
-    );
+  const onDrop = React.useCallback((acceptedFiles: File[]) => {
+    const next = acceptedFiles.map<UploadItem>((f) => ({
+      file: f,
+      progress: 0,
+      status: 'idle',
+    }));
+    setItems(next);
   }, []);
-
-  const uploadWithXhr = useCallback(
-    (id: string, file: File, presigned: PresignedUpload) =>
-      new Promise<void>((resolve, reject) => {
-        updateUpload(id, {
-          status: 'uploading',
-          progress: 0,
-          error: undefined,
-          getUrl: undefined,
-        });
-
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', presigned.putUrl, true);
-        xhr.setRequestHeader('Content-Type', presigned.contentType);
-
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable && event.total > 0) {
-            const percent = Math.round((event.loaded / event.total) * 100);
-            updateUpload(id, { progress: percent });
-          }
-        };
-
-        xhr.onerror = () => {
-          const message = 'Network error while uploading file.';
-          updateUpload(id, { status: 'error', error: message });
-          reject(new Error(message));
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            updateUpload(id, { progress: 100, status: 'done', getUrl: presigned.getUrl });
-            resolve();
-          } else {
-            const message = `Upload failed with status ${xhr.status}.`;
-            updateUpload(id, { status: 'error', error: message });
-            reject(new Error(message));
-          }
-        };
-
-        xhr.send(file);
-      }),
-    [updateUpload]
-  );
-
-  const handleDropRejected = useCallback((fileRejections: FileRejection[]) => {
-    const description = fileRejections
-      .map((rejection) =>
-        rejection.errors.map((err) => `${rejection.file.name}: ${err.message}`).join(', ')
-      )
-      .join(', ');
-    window.alert(description || 'Some files were rejected. Please upload images only.');
-  }, []);
-
-  const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
-      if (acceptedFiles.length === 0) {
-        return;
-      }
-
-      const initialItems: UploadItem[] = acceptedFiles.map((file, index) => ({
-        id: `${Date.now()}-${index}-${file.name}`,
-        file,
-        progress: 0,
-        status: 'pending',
-      }));
-
-      setUploads(initialItems);
-      setIsUploading(true);
-
-      try {
-        const response = await fetch('/api/uploads', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            count: acceptedFiles.length,
-            contentTypes: acceptedFiles.map((file) => file.type),
-          }),
-        });
-
-        const payload = await response.json().catch(() => null);
-
-        if (!response.ok) {
-          const message = (payload && payload.message) || 'Failed to request upload URLs.';
-          throw new Error(message);
-        }
-
-        if (!Array.isArray(payload) || payload.length !== acceptedFiles.length) {
-          throw new Error('Unexpected response from upload endpoint.');
-        }
-
-        const uploadsResult = await Promise.allSettled(
-          payload.map((item, index) => {
-            if (
-              typeof item !== 'object' ||
-              item === null ||
-              typeof item.putUrl !== 'string' ||
-              typeof item.getUrl !== 'string' ||
-              typeof item.key !== 'string' ||
-              typeof item.contentType !== 'string'
-            ) {
-              return Promise.reject<void>(new Error('Malformed upload response.'));
-            }
-
-            const presigned: PresignedUpload = {
-              key: item.key,
-              putUrl: item.putUrl,
-              getUrl: item.getUrl,
-              contentType: item.contentType,
-            };
-
-            return uploadWithXhr(initialItems[index].id, acceptedFiles[index], presigned);
-          })
-        );
-
-        const firstError = uploadsResult.find(
-          (result): result is PromiseRejectedResult => result.status === 'rejected'
-        );
-
-        if (firstError) {
-          const message =
-            firstError.reason instanceof Error
-              ? firstError.reason.message
-              : 'One or more uploads failed.';
-          throw new Error(message);
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Upload failed.';
-        setUploads((prev) =>
-          prev.map((item) =>
-            item.status === 'done' ? item : { ...item, status: 'error', error: message }
-          )
-        );
-        window.alert(message);
-      } finally {
-        setIsUploading(false);
-      }
-    },
-    [uploadWithXhr]
-  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'] },
     onDrop,
-    onDropRejected: handleDropRejected,
-    accept: { 'image/*': [] },
     multiple: true,
-    disabled: isUploading,
   });
 
+  async function requestPresigned(files: File[]): Promise<Presigned[]> {
+    const body = {
+      count: files.length,
+      contentTypes: files.map((f) => f.type || 'application/octet-stream'),
+    };
+    const res = await fetch('/api/uploads', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const t = await res.json().catch(() => ({}));
+      throw new Error(t?.message || 'Failed to get presigned URLs');
+    }
+    const data = (await res.json()) as Presigned[];
+    return data;
+  }
+
+  function uploadWithProgress(url: string, file: File, onProgress: (pct: number) => void) {
+    return new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', url);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        const pct = Math.round((e.loaded / e.total) * 100);
+        onProgress(pct);
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else reject(new Error(`Upload failed ${xhr.status}`));
+      };
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.send(file);
+    });
+  }
+
+  async function handleStartUpload() {
+    try {
+      setBusy(true);
+      const files = items.map((i) => i.file);
+      const presigned = await requestPresigned(files);
+
+      // map presigned to items and PUT
+      const updated = [...items];
+      for (let i = 0; i < updated.length; i++) {
+        const it = updated[i];
+        const p = presigned[i];
+        it.key = p.key;
+        it.putUrl = p.putUrl;
+        it.getUrl = p.getUrl;
+        it.status = 'uploading';
+        setItems([...updated]);
+
+        try {
+          await uploadWithProgress(p.putUrl, it.file, (pct) => {
+            updated[i].progress = pct;
+            setItems([...updated]);
+          });
+          updated[i].status = 'done';
+          updated[i].progress = 100;
+          setItems([...updated]);
+        } catch (e: any) {
+          updated[i].status = 'error';
+          updated[i].error = e?.message || 'Upload failed';
+          setItems([...updated]);
+        }
+      }
+
+      // After all uploads, call ingest
+      const okItems = updated.filter((x) => x.status === 'done' && x.key);
+      if (okItems.length) {
+        const body = { photos: okItems.map((x) => ({ key: x.key!, contentType: x.file.type })) };
+        const res = await fetch('/api/ingest', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          const { jobId } = (await res.json()) as { jobId: string };
+          setJobId(jobId);
+        } else {
+          console.error('ingest failed', await res.text());
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Poll job status
+  React.useEffect(() => {
+    if (!jobId) return;
+    let timer: any;
+    const tick = async () => {
+      const res = await fetch(`/api/jobs/${jobId}/status`);
+      if (!res.ok) return;
+      const data = (await res.json()) as { status: string; progress: number };
+      setJobStatus(data);
+      if (data.status !== 'completed') {
+        timer = setTimeout(tick, 1000);
+      }
+    };
+    tick();
+    return () => clearTimeout(timer);
+  }, [jobId]);
+
+  const canStart = items.length > 0 && !busy && items.every((i) => i.status === 'idle' || i.status === 'error');
+
   return (
-    <section>
+    <div className="max-w-2xl mx-auto p-6">
+      <h2 className="text-xl font-semibold">Upload photos</h2>
       <div
-        {...getRootProps({
-          className: 'uploader-dropzone',
-          style: {
-            border: '2px dashed #888',
-            borderRadius: '8px',
-            padding: '2rem',
-            textAlign: 'center',
-            backgroundColor: isDragActive ? '#f0f6ff' : '#fafafa',
-            color: '#333',
-            cursor: isUploading ? 'not-allowed' : 'pointer',
-            outline: 'none',
-          },
-          tabIndex: 0,
-        })}
-        aria-busy={isUploading}
+        {...getRootProps()}
+        style={{
+          marginTop: 12,
+          padding: 20,
+          border: '2px dashed #aaa',
+          borderRadius: 8,
+          background: isDragActive ? '#fafafa' : '#fff',
+          cursor: 'pointer',
+        }}
+        aria-label="Drop photos here"
       >
         <input {...getInputProps()} />
-        <p style={{ fontSize: '1rem', margin: 0 }}>
-          {isDragActive ? 'Drop the images here…' : 'Drag and drop images here, or click to browse.'}
-        </p>
-        <p style={{ marginTop: '0.5rem', color: '#666' }}>
-          {isUploading
-            ? `Uploading ${uploads.length} file${uploads.length === 1 ? '' : 's'}…`
-            : 'Only image files are supported.'}
-        </p>
+        {isDragActive ? <p>Thả ảnh vào đây…</p> : <p>Kéo & thả ảnh vào đây, hoặc bấm để chọn</p>}
       </div>
 
-      {uploads.length > 0 && (
-        <ul style={{ listStyle: 'none', marginTop: '1.5rem', padding: 0 }}>
-          {uploads.map((item) => (
-            <li
-              key={item.id}
-              style={{
-                border: '1px solid #e0e0e0',
-                borderRadius: '6px',
-                padding: '1rem',
-                marginBottom: '1rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                <div>
-                  <strong style={{ display: 'block' }}>{item.file.name}</strong>
-                  <span style={{ color: '#666' }}>{formatBytes(item.file.size)}</span>
-                </div>
-                {item.getUrl && item.status === 'done' && (
-                  <a
-                    href={item.getUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: '#1d4ed8' }}
-                  >
-                    Preview
-                  </a>
-                )}
+      <div style={{ marginTop: 16 }}>
+        {items.map((it, idx) => (
+          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 0' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14 }}>
+                {it.file.name} ({Math.round(it.file.size / 1024)} KB)
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <progress value={item.progress} max={100} style={{ width: '100%' }} />
-                <span aria-live="polite">
-                  {item.status === 'uploading'
-                    ? `Uploading… ${item.progress}%`
-                    : item.status === 'done'
-                    ? 'Upload complete'
-                    : item.status === 'error'
-                    ? `Error: ${item.error ?? 'Upload failed.'}`
-                    : 'Waiting to upload'}
-                </span>
+              <div style={{ fontSize: 12, color: '#666' }}>{it.status}</div>
+              <div aria-live="polite" style={{ height: 8, background: '#eee', borderRadius: 4, marginTop: 6 }}>
+                <div
+                  style={{
+                    width: `${it.progress}%`,
+                    height: 8,
+                    borderRadius: 4,
+                    background: '#4a90e2',
+                    transition: 'width 200ms',
+                  }}
+                />
               </div>
-              {item.error && item.status === 'error' && (
-                <span role="alert" style={{ color: '#b91c1c' }}>
-                  {item.error}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
+            </div>
+            {it.getUrl && it.status === 'done' && (
+              <a href={it.getUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                Preview
+              </a>
+            )}
+            {it.status === 'error' && <span style={{ color: 'red', fontSize: 12 }}>{it.error}</span>}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+        <button
+          onClick={handleStartUpload}
+          disabled={!canStart}
+          style={{
+            padding: '8px 12px',
+            borderRadius: 6,
+            border: '1px solid #ccc',
+            background: canStart ? '#111' : '#999',
+            color: '#fff',
+          }}
+        >
+          Start upload & ingest
+        </button>
+      </div>
+
+      {jobId && (
+        <div style={{ marginTop: 16 }}>
+          <div>
+            Job: <code>{jobId}</code>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <div style={{ height: 10, background: '#eee', borderRadius: 6 }}>
+              <div
+                style={{
+                  height: 10,
+                  width: `${jobStatus?.progress ?? 0}%`,
+                  background: '#0a7',
+                  borderRadius: 6,
+                  transition: 'width 300ms',
+                }}
+              />
+            </div>
+            <div style={{ fontSize: 12, marginTop: 4 }}>
+              {jobStatus ? `${jobStatus.progress}% — ${jobStatus.status}` : 'Starting…'}
+            </div>
+          </div>
+        </div>
       )}
-    </section>
+    </div>
   );
 }
