@@ -1,0 +1,20 @@
+{
+  "name": "@photo/db",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prisma": "prisma",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate dev",
+    "seed": "tsx src/seed.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.19.1"
+  },
+  "devDependencies": {
+    "prisma": "^5.19.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.2"
+  }
+}

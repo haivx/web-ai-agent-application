@@ -1,0 +1,44 @@
+// url comes from DATABASE_URL in root .env
+// To enable pgvector later, we will add a SQL migration like:
+//   CREATE EXTENSION IF NOT EXISTS vector;
+//   ALTER TABLE "Face" ADD COLUMN embedding_vec vector(512);
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Image {
+  id         String   @id @default(uuid())
+  userId     String
+  storageKey String
+  url        String
+  status     String   @default("queued") // queued|processed|failed
+  createdAt  DateTime @default(now())
+  faces      Face[]
+}
+
+model Face {
+  id         String   @id @default(uuid())
+  imageId    String
+  userId     String
+  embedding  Bytes    // temporary; switch to pgvector later
+  bbox       Json
+  clusterId  String?
+  createdAt  DateTime @default(now())
+
+  image      Image    @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  cluster    Cluster? @relation(fields: [clusterId], references: [id])
+}
+
+model Cluster {
+  id        String   @id @default(uuid())
+  userId    String
+  label     String?
+  createdAt DateTime @default(now())
+  faces     Face[]
+}
