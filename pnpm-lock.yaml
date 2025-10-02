@@ -1,0 +1,39 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+  .:
+    dependencies: {}
+    devDependencies: {}
+  apps/web:
+    dependencies:
+      next:
+        specifier: workspace:*
+        version: link:../services/next
+      react:
+        specifier: workspace:*
+        version: link:../services/react
+      react-dom:
+        specifier: workspace:*
+        version: link:../services/react-dom
+    devDependencies: {}
+  services/next:
+    dependencies: {}
+    devDependencies: {}
+  services/react:
+    dependencies: {}
+    devDependencies: {}
+  services/react-dom:
+    dependencies: {}
+    devDependencies: {}
+
+packages:
+  link:../services/next:
+    resolution: {directory: ../services/next, type: directory}
+  link:../services/react:
+    resolution: {directory: ../services/react, type: directory}
+  link:../services/react-dom:
+    resolution: {directory: ../services/react-dom, type: directory}

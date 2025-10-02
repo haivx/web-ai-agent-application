@@ -1,0 +1,29 @@
+{
+  "name": "next",
+  "version": "0.0.0-stub",
+  "private": false,
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./index.js",
+      "default": "./index.js",
+      "types": "./index.d.ts"
+    },
+    "./types": {
+      "default": "./types/index.d.ts",
+      "types": "./types/index.d.ts"
+    },
+    "./types/*": {
+      "default": "./types/*.d.ts",
+      "types": "./types/*.d.ts"
+    },
+    "./image-types/*": {
+      "default": "./image-types/*.d.ts",
+      "types": "./image-types/*.d.ts"
+    }
+  },
+  "bin": {
+    "next": "./bin/next.js"
+  }
+}
