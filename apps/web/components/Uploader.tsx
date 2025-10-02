@@ -229,6 +229,14 @@ export default function Uploader() {
             </div>
             <div style={{ fontSize: 12, marginTop: 4 }}>
               {jobStatus ? `${jobStatus.progress}% — ${jobStatus.status}` : 'Starting…'}
+              {jobStatus?.status === 'completed' && (
+                <a
+                  href="/gallery"
+                  style={{ marginLeft: 8, fontSize: 14, textDecoration: 'underline' }}
+                >
+                  View Gallery →
+                </a>
+              )}
             </div>
           </div>
         </div>
